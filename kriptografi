@@ -1,0 +1,748 @@
+import tkinter as tk
+from tkinter import ttk
+import random
+import math
+
+def gcd(a,b):
+    while b!=0:
+        a,b=b,a%b
+    return a
+
+def mod_exp(base,exp,mod):
+    result=1
+    base%=mod
+    while exp>0:
+        if exp%2==1:
+            result=(result*base)%mod
+        exp//=2
+        base=(base*base)%mod
+    return result
+
+def mod_inverse(a,m):
+    for x in range(1,m):
+        if (a*x)%m==1:
+            return x
+    return None
+
+def is_prime(n):
+    if n<2:
+        return False
+    for i in range(2,int(math.sqrt(n))+1):
+        if n%i==0:
+            return False
+    return True
+
+def generate_prime():
+    while True:
+        num=random.randint(100,300)
+        if is_prime(num):
+            return num
+
+# RSA
+
+def rsa_generate():
+
+    global rsa_e,rsa_d,rsa_n
+
+    p=generate_prime()
+    q=generate_prime()
+
+    rsa_n=p*q
+    phi=(p-1)*(q-1)
+
+    rsa_e=random.randint(2,phi-1)
+    while gcd(rsa_e,phi)!=1:
+        rsa_e=random.randint(2,phi-1)
+
+    rsa_d=mod_inverse(rsa_e,phi)
+
+    rsa_pub.config(text=f"Public Key (e,n): {rsa_e},{rsa_n}")
+    rsa_priv.config(text=f"Private Key (d,n): {rsa_d},{rsa_n}")
+
+def rsa_encrypt():
+
+    text=rsa_plain.get()
+    cipher=[]
+
+    for c in text:
+        cipher.append(str(mod_exp(ord(c),rsa_e,rsa_n)))
+
+    rsa_cipher.delete(0,tk.END)
+    rsa_cipher.insert(0," ".join(cipher))
+
+def rsa_decrypt():
+
+    cipher=rsa_cipher.get().split()
+
+    text=""
+
+    for c in cipher:
+        m=mod_exp(int(c),rsa_d,rsa_n)
+        text+=chr(m)
+
+    rsa_decrypted.delete(0,tk.END)
+    rsa_decrypted.insert(0,text)
+
+
+# DIFFIE HELLMAN
+
+
+def dh_compute():
+
+    p=dh_p.get()
+    g=dh_g.get()
+    a=dh_a.get()
+    b=dh_b.get()
+
+    p=int(p)
+    g=int(g)
+    a=int(a)
+    b=int(b)
+
+    A=mod_exp(g,a,p)
+    B=mod_exp(g,b,p)
+
+    keyA=mod_exp(B,a,p)
+    keyB=mod_exp(A,b,p)
+
+    dh_result.config(text=f"A={A} B={B}\nSharedKeyA={keyA}\nSharedKeyB={keyB}")
+
+# ELGAMAL
+
+def elgamal_generate():
+
+    global elg_p,elg_g,elg_x,elg_y
+
+    elg_p=generate_prime()
+    elg_g=random.randint(2,elg_p-1)
+    elg_x=random.randint(2,elg_p-2)
+
+    elg_y=mod_exp(elg_g,elg_x,elg_p)
+
+    elg_pub.config(text=f"Public: p={elg_p} g={elg_g} y={elg_y}")
+    elg_priv.config(text=f"Private x={elg_x}")
+
+def elgamal_encrypt():
+
+    m=int(elg_plain.get())
+
+    k=random.randint(2,elg_p-2)
+
+    a=mod_exp(elg_g,k,elg_p)
+    b=(m*mod_exp(elg_y,k,elg_p))%elg_p
+
+    elg_cipher.delete(0,tk.END)
+    elg_cipher.insert(0,f"{a},{b}")
+
+def elgamal_decrypt():
+
+    a,b=elg_cipher.get().split(",")
+    a=int(a)
+    b=int(b)
+
+    s=mod_exp(a,elg_x,elg_p)
+    s_inv=mod_inverse(s,elg_p)
+
+    m=(b*s_inv)%elg_p
+
+    elg_decrypted.delete(0,tk.END)
+    elg_decrypted.insert(0,str(m))
+
+# ECC 
+
+def ecc_add(P,Q,a,p):
+
+    if P=="O": return Q
+    if Q=="O": return P
+
+    x1,y1=P
+    x2,y2=Q
+
+    if x1==x2 and y1!=y2:
+        return "O"
+
+    if P!=Q:
+        m=((y2-y1)*mod_inverse(x2-x1,p))%p
+    else:
+        m=((3*x1*x1+a)*mod_inverse(2*y1,p))%p
+
+    x3=(m*m-x1-x2)%p
+    y3=(m*(x1-x3)-y1)%p
+
+    return (x3,y3)
+
+def ecc_multiply(k,P,a,p):
+
+    result="O"
+    temp=P
+
+    while k>0:
+
+        if k%2==1:
+            result=ecc_add(result,temp,a,p)
+
+        temp=ecc_add(temp,temp,a,p)
+
+        k//=2
+
+    return result
+
+def ecc_demo():
+
+    p=97
+    a=2
+    G=(3,6)
+
+    k=int(ecc_k.get())
+
+    point=ecc_multiply(k,G,a,p)
+
+    ecc_result.config(text=f"kG = {point}")
+
+# DSA / DSS SIMPLIFIED
+
+def simple_hash(m):
+
+    h=0
+    for c in m:
+        h+=ord(c)
+
+    return h%1000
+
+def dsa_sign():
+
+    global dsa_p,dsa_q,dsa_g,dsa_x,dsa_y
+
+    dsa_p=593
+    dsa_q=29
+    dsa_g=123
+
+    dsa_x=random.randint(1,dsa_q-1)
+
+    dsa_y=mod_exp(dsa_g,dsa_x,dsa_p)
+
+    message=dsa_message.get()
+
+    h=simple_hash(message)
+
+    k=random.randint(1,dsa_q-1)
+
+    r=mod_exp(dsa_g,k,dsa_p)%dsa_q
+    k_inv=mod_inverse(k,dsa_q)
+
+    s=(k_inv*(h+dsa_x*r))%dsa_q
+
+    dsa_signature.config(text=f"Signature (r,s)=({r},{s})")
+
+def dsa_verify():
+
+    message=dsa_message.get()
+    r=int(dsa_r.get())
+    s=int(dsa_s.get())
+
+    h=simple_hash(message)
+
+    w=mod_inverse(s,dsa_q)
+
+    u1=(h*w)%dsa_q
+    u2=(r*w)%dsa_q
+
+    v=((mod_exp(dsa_g,u1,dsa_p)*mod_exp(dsa_y,u2,dsa_p))%dsa_p)%dsa_q
+
+    if v==r:
+        dsa_verify_result.config(text="Signature VALID")
+    else:
+        dsa_verify_result.config(text="Signature INVALID")
+
+# GUI
+
+
+root=tk.Tk()
+root.title("Asymmetric Cryptography Demo")
+
+tab=ttk.Notebook(root)
+
+# RSA TAMPILAN
+rsa_tab=tk.Frame(tab)
+tab.add(rsa_tab,text="RSA")
+
+rsa_plain=tk.Entry(rsa_tab,width=40)
+rsa_plain.pack()
+
+tk.Button(rsa_tab,text="Generate Key",command=rsa_generate).pack()
+
+rsa_pub=tk.Label(rsa_tab,text="")
+rsa_pub.pack()
+
+rsa_priv=tk.Label(rsa_tab,text="")
+rsa_priv.pack()
+
+tk.Button(rsa_tab,text="Encrypt",command=rsa_encrypt).pack()
+
+rsa_cipher=tk.Entry(rsa_tab,width=40)
+rsa_cipher.pack()
+
+tk.Button(rsa_tab,text="Decrypt",command=rsa_decrypt).pack()
+
+rsa_decrypted=tk.Entry(rsa_tab,width=40)
+rsa_decrypted.pack()
+
+# DIFFIE HELLMAN TAB
+dh_tab=tk.Frame(tab)
+tab.add(dh_tab,text="Diffie Hellman")
+
+dh_p=tk.Entry(dh_tab)
+dh_p.insert(0,"23")
+dh_p.pack()
+
+dh_g=tk.Entry(dh_tab)
+dh_g.insert(0,"5")
+dh_g.pack()
+
+dh_a=tk.Entry(dh_tab)
+dh_a.insert(0,"6")
+dh_a.pack()
+
+dh_b=tk.Entry(dh_tab)
+dh_b.insert(0,"15")
+dh_b.pack()
+
+tk.Button(dh_tab,text="Compute",command=dh_compute).pack()
+
+dh_result=tk.Label(dh_tab,text="")
+dh_result.pack()
+
+# ELGAMAL TAB
+elg_tab=tk.Frame(tab)
+tab.add(elg_tab,text="ElGamal")
+
+tk.Button(elg_tab,text="Generate Key",command=elgamal_generate).pack()
+
+elg_pub=tk.Label(elg_tab,text="")
+elg_pub.pack()
+
+elg_priv=tk.Label(elg_tab,text="")
+elg_priv.pack()
+
+elg_plain=tk.Entry(elg_tab)
+elg_plain.pack()
+
+tk.Button(elg_tab,text="Encrypt",command=elgamal_encrypt).pack()
+
+elg_cipher=tk.Entry(elg_tab)
+elg_cipher.pack()
+
+tk.Button(elg_tab,text="Decrypt",command=elgamal_decrypt).pack()
+
+elg_decrypted=tk.Entry(elg_tab)
+elg_decrypted.pack()
+
+# ECC TAB
+ecc_tab=tk.Frame(tab)
+tab.add(ecc_tab,text="ECC")
+
+ecc_k=tk.Entry(ecc_tab)
+ecc_k.pack()
+
+tk.Button(ecc_tab,text="Compute kG",command=ecc_demo).pack()
+
+ecc_result=tk.Label(ecc_tab,text="")
+ecc_result.pack()
+
+# DSA TAB
+dsa_tab=tk.Frame(tab)
+tab.add(dsa_tab,text="DSA/DSS")
+
+dsa_message=tk.Entry(dsa_tab,width=40)
+dsa_message.pack()
+
+tk.Button(dsa_tab,text="Sign",command=dsa_sign).pack()
+
+dsa_signature=tk.Label(dsa_tab,text="")
+dsa_signature.pack()
+
+dsa_r=tk.Entry(dsa_tab)
+dsa_r.pack()
+
+dsa_s=tk.Entry(dsa_tab)
+dsa_s.pack()
+
+tk.Button(dsa_tab,text="Verify",command=dsa_verify).pack()
+
+dsa_verify_result=tk.Label(dsa_tab,text="")
+dsa_verify_result.pack()
+
+tab.pack(expand=1,fill="both")
+
+root.mainloop()
+
+# UTILITAS MATEMATIKA DASAR
+
+def gcd(a,b):
+    while b!=0:
+        a,b=b,a%b
+    return a
+
+def mod_exp(base,exp,mod):
+    result=1
+    base%=mod
+    while exp>0:
+        if exp%2==1:
+            result=(result*base)%mod
+        exp//=2
+        base=(base*base)%mod
+    return result
+
+def mod_inverse(a,m):
+    for x in range(1,m):
+        if (a*x)%m==1:
+            return x
+    return None
+
+def is_prime(n):
+    if n<2:
+        return False
+    for i in range(2,int(math.sqrt(n))+1):
+        if n%i==0:
+            return False
+    return True
+
+def generate_prime():
+    while True:
+        num=random.randint(100,300)
+        if is_prime(num):
+            return num
+
+# RSA
+
+def rsa_generate():
+
+    global rsa_e,rsa_d,rsa_n
+
+    p=generate_prime()
+    q=generate_prime()
+
+    rsa_n=p*q
+    phi=(p-1)*(q-1)
+
+    rsa_e=random.randint(2,phi-1)
+    while gcd(rsa_e,phi)!=1:
+        rsa_e=random.randint(2,phi-1)
+
+    rsa_d=mod_inverse(rsa_e,phi)
+
+    rsa_pub.config(text=f"Public Key (e,n): {rsa_e},{rsa_n}")
+    rsa_priv.config(text=f"Private Key (d,n): {rsa_d},{rsa_n}")
+
+def rsa_encrypt():
+
+    text=rsa_plain.get()
+    cipher=[]
+
+    for c in text:
+        cipher.append(str(mod_exp(ord(c),rsa_e,rsa_n)))
+
+    rsa_cipher.delete(0,tk.END)
+    rsa_cipher.insert(0," ".join(cipher))
+
+def rsa_decrypt():
+
+    cipher=rsa_cipher.get().split()
+
+    text=""
+
+    for c in cipher:
+        m=mod_exp(int(c),rsa_d,rsa_n)
+        text+=chr(m)
+
+    rsa_decrypted.delete(0,tk.END)
+    rsa_decrypted.insert(0,text)
+
+# DIFFIE HELLMAN
+
+def dh_compute():
+
+    p=dh_p.get()
+    g=dh_g.get()
+    a=dh_a.get()
+    b=dh_b.get()
+
+    p=int(p)
+    g=int(g)
+    a=int(a)
+    b=int(b)
+
+    A=mod_exp(g,a,p)
+    B=mod_exp(g,b,p)
+
+    keyA=mod_exp(B,a,p)
+    keyB=mod_exp(A,b,p)
+
+    dh_result.config(text=f"A={A} B={B}\nSharedKeyA={keyA}\nSharedKeyB={keyB}")
+
+# ELGAMAL
+
+def elgamal_generate():
+
+    global elg_p,elg_g,elg_x,elg_y
+
+    elg_p=generate_prime()
+    elg_g=random.randint(2,elg_p-1)
+    elg_x=random.randint(2,elg_p-2)
+
+    elg_y=mod_exp(elg_g,elg_x,elg_p)
+
+    elg_pub.config(text=f"Public: p={elg_p} g={elg_g} y={elg_y}")
+    elg_priv.config(text=f"Private x={elg_x}")
+
+def elgamal_encrypt():
+
+    m=int(elg_plain.get())
+
+    k=random.randint(2,elg_p-2)
+
+    a=mod_exp(elg_g,k,elg_p)
+    b=(m*mod_exp(elg_y,k,elg_p))%elg_p
+
+    elg_cipher.delete(0,tk.END)
+    elg_cipher.insert(0,f"{a},{b}")
+
+def elgamal_decrypt():
+
+    a,b=elg_cipher.get().split(",")
+    a=int(a)
+    b=int(b)
+
+    s=mod_exp(a,elg_x,elg_p)
+    s_inv=mod_inverse(s,elg_p)
+
+    m=(b*s_inv)%elg_p
+
+    elg_decrypted.delete(0,tk.END)
+    elg_decrypted.insert(0,str(m))
+
+# ECC SIMPLIFIED
+
+def ecc_add(P,Q,a,p):
+
+    if P=="O": return Q
+    if Q=="O": return P
+
+    x1,y1=P
+    x2,y2=Q
+
+    if x1==x2 and y1!=y2:
+        return "O"
+
+    if P!=Q:
+        m=((y2-y1)*mod_inverse(x2-x1,p))%p
+    else:
+        m=((3*x1*x1+a)*mod_inverse(2*y1,p))%p
+
+    x3=(m*m-x1-x2)%p
+    y3=(m*(x1-x3)-y1)%p
+
+    return (x3,y3)
+
+def ecc_multiply(k,P,a,p):
+
+    result="O"
+    temp=P
+
+    while k>0:
+
+        if k%2==1:
+            result=ecc_add(result,temp,a,p)
+
+        temp=ecc_add(temp,temp,a,p)
+
+        k//=2
+
+    return result
+
+def ecc_demo():
+
+    p=97
+    a=2
+    G=(3,6)
+
+    k=int(ecc_k.get())
+
+    point=ecc_multiply(k,G,a,p)
+
+    ecc_result.config(text=f"kG = {point}")
+
+
+# DSA/DSS 
+
+def simple_hash(m):
+
+    h=0
+    for c in m:
+        h+=ord(c)
+
+    return h%1000
+
+def dsa_sign():
+
+    global dsa_p,dsa_q,dsa_g,dsa_x,dsa_y
+
+    dsa_p=593
+    dsa_q=29
+    dsa_g=123
+
+    dsa_x=random.randint(1,dsa_q-1)
+
+    dsa_y=mod_exp(dsa_g,dsa_x,dsa_p)
+
+    message=dsa_message.get()
+
+    h=simple_hash(message)
+
+    k=random.randint(1,dsa_q-1)
+
+    r=mod_exp(dsa_g,k,dsa_p)%dsa_q
+    k_inv=mod_inverse(k,dsa_q)
+
+    s=(k_inv*(h+dsa_x*r))%dsa_q
+
+    dsa_signature.config(text=f"Signature (r,s)=({r},{s})")
+
+def dsa_verify():
+
+    message=dsa_message.get()
+    r=int(dsa_r.get())
+    s=int(dsa_s.get())
+
+    h=simple_hash(message)
+
+    w=mod_inverse(s,dsa_q)
+
+    u1=(h*w)%dsa_q
+    u2=(r*w)%dsa_q
+
+    v=((mod_exp(dsa_g,u1,dsa_p)*mod_exp(dsa_y,u2,dsa_p))%dsa_p)%dsa_q
+
+    if v==r:
+        dsa_verify_result.config(text="Signature VALID")
+    else:
+        dsa_verify_result.config(text="Signature INVALID")
+
+root=tk.Tk()
+root.title("Asymmetric Cryptography Demo")
+
+tab=ttk.Notebook(root)
+
+# RSA 
+rsa_tab=tk.Frame(tab)
+tab.add(rsa_tab,text="RSA")
+
+rsa_plain=tk.Entry(rsa_tab,width=40)
+rsa_plain.pack()
+
+tk.Button(rsa_tab,text="Generate Key",command=rsa_generate).pack()
+
+rsa_pub=tk.Label(rsa_tab,text="")
+rsa_pub.pack()
+
+rsa_priv=tk.Label(rsa_tab,text="")
+rsa_priv.pack()
+
+tk.Button(rsa_tab,text="Encrypt",command=rsa_encrypt).pack()
+
+rsa_cipher=tk.Entry(rsa_tab,width=40)
+rsa_cipher.pack()
+
+tk.Button(rsa_tab,text="Decrypt",command=rsa_decrypt).pack()
+
+rsa_decrypted=tk.Entry(rsa_tab,width=40)
+rsa_decrypted.pack()
+
+# DIFFIE HELLMAN 
+dh_tab=tk.Frame(tab)
+tab.add(dh_tab,text="Diffie Hellman")
+
+dh_p=tk.Entry(dh_tab)
+dh_p.insert(0,"23")
+dh_p.pack()
+
+dh_g=tk.Entry(dh_tab)
+dh_g.insert(0,"5")
+dh_g.pack()
+
+dh_a=tk.Entry(dh_tab)
+dh_a.insert(0,"6")
+dh_a.pack()
+
+dh_b=tk.Entry(dh_tab)
+dh_b.insert(0,"15")
+dh_b.pack()
+
+tk.Button(dh_tab,text="Compute",command=dh_compute).pack()
+
+dh_result=tk.Label(dh_tab,text="")
+dh_result.pack()
+
+# ELGAMAL TAB
+elg_tab=tk.Frame(tab)
+tab.add(elg_tab,text="ElGamal")
+
+tk.Button(elg_tab,text="Generate Key",command=elgamal_generate).pack()
+
+elg_pub=tk.Label(elg_tab,text="")
+elg_pub.pack()
+
+elg_priv=tk.Label(elg_tab,text="")
+elg_priv.pack()
+
+elg_plain=tk.Entry(elg_tab)
+elg_plain.pack()
+
+tk.Button(elg_tab,text="Encrypt",command=elgamal_encrypt).pack()
+
+elg_cipher=tk.Entry(elg_tab)
+elg_cipher.pack()
+
+tk.Button(elg_tab,text="Decrypt",command=elgamal_decrypt).pack()
+
+elg_decrypted=tk.Entry(elg_tab)
+elg_decrypted.pack()
+
+# ECC
+ecc_tab=tk.Frame(tab)
+tab.add(ecc_tab,text="ECC")
+
+ecc_k=tk.Entry(ecc_tab)
+ecc_k.pack()
+
+tk.Button(ecc_tab,text="Compute kG",command=ecc_demo).pack()
+
+ecc_result=tk.Label(ecc_tab,text="")
+ecc_result.pack()
+
+# DSA 
+dsa_tab=tk.Frame(tab)
+tab.add(dsa_tab,text="DSA/DSS")
+
+dsa_message=tk.Entry(dsa_tab,width=40)
+dsa_message.pack()
+
+tk.Button(dsa_tab,text="Sign",command=dsa_sign).pack()
+
+dsa_signature=tk.Label(dsa_tab,text="")
+dsa_signature.pack()
+
+dsa_r=tk.Entry(dsa_tab)
+dsa_r.pack()
+
+dsa_s=tk.Entry(dsa_tab)
+dsa_s.pack()
+
+tk.Button(dsa_tab,text="Verify",command=dsa_verify).pack()
+
+dsa_verify_result=tk.Label(dsa_tab,text="")
+dsa_verify_result.pack()
+
+tab.pack(expand=1,fill="both")
+
+root.mainloop()
